@@ -6,91 +6,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body{
-  font-family: system-ui, Arial, sans-serif;
-  background:#f4f6f8;
-  margin:0;
-  padding:12px;
-}
-
-h2{
-  margin-bottom:8px;
-}
-
-label{
-  font-weight:600;
-}
-
-input, select{
-  padding:6px;
-  border:1px solid #ccc;
-  border-radius:4px;
-  width:100%;
-}
-
-button{
-  padding:8px 14px;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
-  font-weight:600;
-}
-
-.add-btn{
-  background:#2563eb;
-  color:#fff;
-}
-
-.del-btn{
-  background:#dc2626;
-  color:#fff;
-}
-
-.print-btn{
-  background:#16a34a;
-  color:#fff;
-  margin-top:10px;
-}
-
-table{
-  width:100%;
-  border-collapse:collapse;
-  background:#fff;
-  margin-top:10px;
-  font-size:14px;
-}
-
-thead{
-  background:#e5e7eb;
-  position:sticky;
-  top:0;
-}
-
-th, td{
-  border:1px solid #d1d5db;
-  padding:6px;
-  text-align:center;
-}
-
-.cancelled{
-  background:#fee2e2;
-  text-decoration:line-through;
-}
-
-.summary{
-  background:#eef2ff;
-  padding:12px;
-  border-radius:8px;
-  margin-top:14px;
-}
-
-.summary p{
-  margin:4px 0;
-}
-
-@media(max-width:768px){
-  th, td{font-size:12px;}
-}
+body{font-family:system-ui,Arial;background:#f4f6f8;margin:0;padding:12px}
+h2{margin-bottom:8px}
+label{font-weight:600}
+input,select{padding:6px;border:1px solid #ccc;border-radius:4px;width:100%}
+button{padding:8px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600}
+.add-btn{background:#2563eb;color:#fff}
+.del-btn{background:#dc2626;color:#fff}
+.print-btn{background:#16a34a;color:#fff;margin-top:10px}
+table{width:100%;border-collapse:collapse;background:#fff;margin-top:10px;font-size:14px}
+thead{background:#e5e7eb;position:sticky;top:0}
+th,td{border:1px solid #d1d5db;padding:6px;text-align:center}
+.cancelled{background:#fee2e2;text-decoration:line-through}
+.summary{background:#eef2ff;padding:12px;border-radius:8px;margin-top:14px}
+.summary p{margin:4px 0}
 </style>
 </head>
 
@@ -99,7 +28,7 @@ th, td{
 <h2>🛕 Annkut Pavti Entry</h2>
 
 <label>Starting Pavti No:</label>
-<input type="number" id="startNo" value="1">
+<input type="number" id="startNo">
 
 <table id="entryTable">
 <thead>
@@ -132,8 +61,9 @@ th, td{
 
 <script>
 let currentNo = 0;
+const STORAGE_KEY = "annkut_pavti_data";
 
-function addRow(){
+function addRow(data=null){
   let start = Number(document.getElementById("startNo").value || 1);
   if(currentNo === 0) currentNo = start;
 
@@ -141,98 +71,124 @@ function addRow(){
   const row = tbody.insertRow();
 
   row.innerHTML = `
-  <td><input type="number" value="${currentNo}"></td>
-  <td>
-    <select onchange="calc()">
-      <option></option>
-      <option>Cash</option>
-      <option>Samagri</option>
-    </select>
-  </td>
-  <td><input type="number" oninput="calc()"></td>
-  <td>
-    <select onchange="calc()">
-      <option></option>
-      <option>Rokda</option>
-      <option>Online</option>
-    </select>
-  </td>
-  <td><input type="checkbox" onchange="toggleCancel(this)"></td>
-  <td><button class="del-btn" onclick="deleteRow(this)">❌</button></td>
+    <td><input type="number" value="${data?.pavti ?? currentNo}"></td>
+    <td>
+      <select>
+        <option></option>
+        <option>Cash</option>
+        <option>Samagri</option>
+      </select>
+    </td>
+    <td><input type="number"></td>
+    <td>
+      <select>
+        <option></option>
+        <option>Rokda</option>
+        <option>Online</option>
+      </select>
+    </td>
+    <td><input type="checkbox"></td>
+    <td><button class="del-btn">❌</button></td>
   `;
 
+  row.querySelector("select:nth-child(1)")?.value;
+  row.querySelector("select").value = data?.prakar || "";
+  row.cells[2].children[0].value = data?.rakam || "";
+  row.cells[3].children[0].value = data?.mode || "";
+  row.cells[4].children[0].checked = data?.cancelled || false;
+
+  row.querySelectorAll("input,select").forEach(el=>{
+    el.addEventListener("input", ()=>{saveData();calc();});
+    el.addEventListener("change", ()=>{saveData();calc();});
+  });
+
+  row.querySelector(".del-btn").onclick = ()=>{
+    row.remove();
+    saveData();
+    calc();
+  };
+
+  if(data?.cancelled) row.classList.add("cancelled");
+
+  row.cells[4].children[0].onchange = e=>{
+    row.classList.toggle("cancelled", e.target.checked);
+    saveData(); calc();
+  };
+
   currentNo++;
-}
-
-function deleteRow(btn){
-  btn.closest("tr").remove();
+  saveData();
   calc();
 }
 
-function toggleCancel(cb){
-  const row = cb.closest("tr");
-  row.classList.toggle("cancelled", cb.checked);
-  calc();
-}
-
-function round100(v){
-  return Math.round(v/100)*100;
-}
+function round100(v){return Math.round(v/100)*100;}
 
 function calc(){
   let rows = document.querySelectorAll("#entryTable tbody tr");
-  let totalCash=0, samCount=0, samAmount=0, onlineAmt=0, onlineCnt=0;
-  let map={};
+  let totalCash=0,samCount=0,samAmount=0,onlineAmt=0,onlineCnt=0,map={};
 
   rows.forEach(r=>{
-    if(r.querySelector('input[type="checkbox"]').checked) return;
+    if(r.cells[4].children[0].checked) return;
+    let pr=r.cells[1].children[0].value;
+    let amt=Number(r.cells[2].children[0].value||0);
+    let mode=r.cells[3].children[0].value;
 
-    let pr = r.cells[1].children[0].value;
-    let amt = Number(r.cells[2].children[0].value || 0);
-    let mode = r.cells[3].children[0].value;
-
-    if(pr==="Cash" && amt>0){
+    if(pr==="Cash"&&amt>0){
       totalCash+=amt;
       let k=round100(amt);
       map[k]=(map[k]||0)+1;
-      if(mode==="Online"){
-        onlineAmt+=amt;
-        onlineCnt++;
-      }
+      if(mode==="Online"){onlineAmt+=amt;onlineCnt++;}
     }
-
-    if(pr==="Samagri" && amt>0){
-      samCount++;
-      samAmount+=amt;
-    }
+    if(pr==="Samagri"&&amt>0){samCount++;samAmount+=amt;}
   });
 
-  let html="";
-  Object.keys(map).sort((a,b)=>a-b).forEach(k=>{
-    html+=`<p>₹${k} Count: <b>${map[k]}</b></p>`;
-  });
-  document.getElementById("roundedCounts").innerHTML = html;
+  document.getElementById("roundedCounts").innerHTML =
+    Object.keys(map).sort((a,b)=>a-b).map(k=>`<p>₹${k} Count: <b>${map[k]}</b></p>`).join("");
 
-  totalCash.textContent = totalCash;
-  samCountSpan.textContent = samCount;
-  samAmountSpan.textContent = samAmount;
-  onlineAmtSpan.textContent = onlineAmt;
-  onlineCntSpan.textContent = onlineCnt;
+  totalCashEl.textContent=totalCash;
+  samCountEl.textContent=samCount;
+  samAmountEl.textContent=samAmount;
+  onlineAmtEl.textContent=onlineAmt;
+  onlineCntEl.textContent=onlineCnt;
 }
 
-const totalCash = document.getElementById("totalCash");
-const samCountSpan = document.getElementById("samCount");
-const samAmountSpan = document.getElementById("samAmount");
-const onlineAmtSpan = document.getElementById("onlineAmt");
-const onlineCntSpan = document.getElementById("onlineCnt");
+const totalCashEl=document.getElementById("totalCash");
+const samCountEl=document.getElementById("samCount");
+const samAmountEl=document.getElementById("samAmount");
+const onlineAmtEl=document.getElementById("onlineAmt");
+const onlineCntEl=document.getElementById("onlineCnt");
+
+function saveData(){
+  const rows=[...document.querySelectorAll("#entryTable tbody tr")].map(r=>({
+    pavti:r.cells[0].children[0].value,
+    prakar:r.cells[1].children[0].value,
+    rakam:r.cells[2].children[0].value,
+    mode:r.cells[3].children[0].value,
+    cancelled:r.cells[4].children[0].checked
+  }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    startNo:document.getElementById("startNo").value,
+    currentNo, rows
+  }));
+}
+
+function loadData(){
+  let d=JSON.parse(localStorage.getItem(STORAGE_KEY)||"null");
+  if(!d) return;
+  document.getElementById("startNo").value=d.startNo;
+  currentNo=d.currentNo||0;
+  d.rows.forEach(r=>addRow(r));
+}
 
 function printSummary(){
-  let w = window.open("");
+  let w=window.open("");
   w.document.write("<h2>Annkut Final Summary</h2>");
   w.document.write(document.getElementById("summary").innerHTML);
   w.print();
   w.close();
 }
+
+document.getElementById("startNo").addEventListener("input", saveData);
+loadData();
 </script>
 
 </body>
