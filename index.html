@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Annkut Entry System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{font-family:Arial;padding:10px;background:#f7f7f7}
+table{width:100%;border-collapse:collapse;background:#fff}
+th,td{border:1px solid #ccc;padding:6px;text-align:center}
+select,input{width:100%}
+button{margin-top:10px;padding:8px 12px}
+.summary{background:#eef;padding:10px;margin-top:15px}
+.cancel{background:#ffe6e6}
+</style>
+</head>
+<body>
+
+<h2>🛕 Annkut Pavti Entry</h2>
+
+<label><b>Starting Pavti No:</b></label>
+<input type="number" id="startNo" value="1">
+
+<table id="entryTable">
+<tr>
+<th>Pavti No</th>
+<th>Prakar</th>
+<th>Rakam</th>
+<th>Cash Mode</th>
+<th>Cancelled</th>
+</tr>
+</table>
+
+<button onclick="addRow()">➕ Add Entry</button>
+
+<div class="summary" id="summary">
+<h3>📊 Final Summary</h3>
+<div id="roundedCounts"></div>
+<hr>
+<p>Total Cash: ₹<span id="totalCash">0</span></p>
+<p>Samagri Count: <span id="samCount">0</span></p>
+<p>Samagri Amount: ₹<span id="samAmount">0</span></p>
+<p>Online Amount: ₹<span id="onlineAmt">0</span></p>
+<p>Online Entries: <span id="onlineCnt">0</span></p>
+</div>
+
+<button onclick="printSummary()">🖨️ Print Summary</button>
+
+<script>
+let currentNo=0;
+
+function addRow(){
+  let start=document.getElementById("startNo").value;
+  if(currentNo===0) currentNo=Number(start);
+
+  let t=document.getElementById("entryTable");
+  let r=t.insertRow();
+
+  r.innerHTML=`
+<td><input type="number" value="${currentNo}"></td>
+<td>
+<select onchange="calc()">
+<option></option>
+<option>Cash</option>
+<option>Samagri</option>
+</select>
+</td>
+<td><input type="number" oninput="calc()"></td>
+<td>
+<select onchange="calc()">
+<option></option>
+<option>Rokda</option>
+<option>Online</option>
+</select>
+</td>
+<td>
+<input type="checkbox" onchange="toggleCancel(this)">
+</td>`;
+  currentNo++;
+}
+
+function toggleCancel(cb){
+  let row=cb.parentNode.parentNode;
+  if(cb.checked){
+    row.classList.add("cancel");
+  }else{
+    row.classList.remove("cancel");
+  }
+  calc();
+}
+
+function round100(v){return Math.round(v/100)*100;}
+
+function calc(){
+  let rows=document.querySelectorAll("#entryTable tr");
+  let totalCash=0,samCount=0,samAmount=0,onlineAmt=0,onlineCnt=0;
+  let map={};
+
+  rows.forEach((r,i)=>{
+    if(i===0) return;
+    if(r.cells[4].children[0].checked) return;
+
+    let pr=r.cells[1].children[0].value;
+    let amt=Number(r.cells[2].children[0].value||0);
+    let mode=r.cells[3].children[0].value;
+
+    if(pr==="Cash" && amt>0){
+      totalCash+=amt;
+      let k=round100(amt);
+      map[k]=(map[k]||0)+1;
+      if(mode==="Online"){onlineAmt+=amt;onlineCnt++;}
+    }
+
+    if(pr==="Samagri" && amt>0){
+      samCount++;
+      samAmount+=amt;
+    }
+  });
+
+  let html="";
+  Object.keys(map).sort((a,b)=>a-b).forEach(k=>{
+    html+=`<p>₹${k} Count: <b>${map[k]}</b></p>`;
+  });
+  document.getElementById("roundedCounts").innerHTML=html;
+
+  totalCash.textContent=totalCash;
+  samCountSpan.textContent=samCount;
+  samAmountSpan.textContent=samAmount;
+  onlineAmtSpan.textContent=onlineAmt;
+  onlineCntSpan.textContent=onlineCnt;
+}
+
+const totalCash=document.getElementById("totalCash");
+const samCountSpan=document.getElementById("samCount");
+const samAmountSpan=document.getElementById("samAmount");
+const onlineAmtSpan=document.getElementById("onlineAmt");
+const onlineCntSpan=document.getElementById("onlineCnt");
+
+function printSummary(){
+  let w=window.open("");
+  w.document.write("<h2>Annkut Final Summary</h2>");
+  w.document.write(document.getElementById("summary").innerHTML);
+  w.print();
+  w.close();
+}
+</script>
+
+</body>
+</html>
